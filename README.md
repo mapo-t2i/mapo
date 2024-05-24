@@ -3,7 +3,7 @@
 This repository provides the official PyTorch implementation for MaPO. 
 
 <div align="center">
-<img src="assets/mapo_overview.png"/>
+<img src="assets/mapo_overview.png" width=750/>
 </div>
 
 _By: Jiwoo Hong<sup>\*</sup>, Sayak Paul<sup>\*</sup>, Noah Lee, Kashif Rasul, James Thorne, Jongheon Jeong_
@@ -128,7 +128,7 @@ vae_id = "madebyollin/sdxl-vae-fp16-fix"
 vae = AutoencoderKL.from_pretrained(vae_id, torch_dtype=torch.float16)
 unet = UNet2DConditionModel.from_pretrained(denoiser_id, torch_dtype=torch.float16)
 pipeline = DiffusionPipeline.from_pretrained(
-  pipeline_id, vae=vae, unet=unet, torch_dtype=torch.float16
+    pipeline_id, vae=vae, unet=unet, torch_dtype=torch.float16
 ).to("cuda")
 
 prompt = "cinematic Disney style animated image"

@@ -155,7 +155,7 @@ def parse_args(input_args=None):
         help="Whether or not to use gradient checkpointing to save memory at the expense of slower backward pass.",
     )
     parser.add_argument(
-        "--beta_orpo",
+        "--beta_mapo",
         type=float,
         default=0.1,
         help="ORPO contribution factor.",

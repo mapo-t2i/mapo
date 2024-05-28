@@ -541,7 +541,7 @@ def main(args):
                 # Ratio loss.
                 # By multiplying T to the inner term, we try to maximize the margin throughout the overall denoising process.
                 ratio = F.logsigmoid(log_odds * noise_scheduler.config.num_train_timesteps)
-                ratio_losses = args.beta_orpo * ratio
+                ratio_losses = args.beta_mapo * ratio
 
                 # Full ORPO loss
                 loss = model_losses_w.mean() - ratio_losses.mean()

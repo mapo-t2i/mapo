@@ -4,7 +4,7 @@ This repository provides the official PyTorch implementation for MaPO.
 
 <div align="center">
 <img src="assets/mapo_overview.png" width=750/>
-</div>
+</div><br>
 
 _By: Jiwoo Hong<sup>\*</sup>, Sayak Paul<sup>\*</sup>, Noah Lee, Kashif Rasul, James Thorne, Jongheon Jeong_
 <br>_(<small><sup>*</sup> indicates equal contribution</small>)_

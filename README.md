@@ -118,32 +118,30 @@ TODO
 ## Inference
 
 ```python
-from diffusers import DiffusionPipeline, UNet2DConditionModel, AutoencoderKL
+from diffusers import DiffusionPipeline, AutoencoderKL, UNet2DConditionModel
 import torch 
 
-pipeline_id = "stabilityai/stable-diffusion-xl-base-1.0"
-denoiser_id = "" # TODO
+sdxl_id = "stabilityai/stable-diffusion-xl-base-1.0"
 vae_id = "madebyollin/sdxl-vae-fp16-fix"
+unet_id = "mapo-t2i/mapo-beta"
 
 vae = AutoencoderKL.from_pretrained(vae_id, torch_dtype=torch.float16)
-unet = UNet2DConditionModel.from_pretrained(denoiser_id, torch_dtype=torch.float16)
-pipeline = DiffusionPipeline.from_pretrained(
-    pipeline_id, vae=vae, unet=unet, torch_dtype=torch.float16
-).to("cuda")
+unet = UNet2DConditionModel.from_pretrained(unet_id, torch_dtype=torch.float16)
+pipeline = DiffusionPipeline.from_pretrained(sdxl_id, vae=vae, unet=unet, torch_dtype=torch.float16).to("cuda")
 
-prompt = "cinematic Disney style animated image"
-image = pipeline(prompt=prompt, num_inference_steps=25).images[0]
+prompt = "A lion with eagle wings coming out of the sea , digital Art, Greg rutkowski, Trending artstation, cinematographic, hyperrealistic"
+image = pipeline(prompt=prompt, num_inference_steps=30).images[0]
 ```
 
 ## Citation
 
 ```bibtex
 @misc{todo,
-      title={Margin-aware Preference Optimization for Aligning Diffusion Models without Reference}, 
-      author={Jiwoo Hong and Sayak Paul and Noah Lee and Kashif Rasuland James Thorne and Jongheon Jeong},
-      year={2024},
-      eprint={todo},
-      archivePrefix={arXiv},
-      primaryClass={cs.CV,cs.LG}
+    title={Margin-aware Preference Optimization for Aligning Diffusion Models without Reference}, 
+    author={Jiwoo Hong and Sayak Paul and Noah Lee and Kashif Rasuland James Thorne and Jongheon Jeong},
+    year={2024},
+    eprint={todo},
+    archivePrefix={arXiv},
+    primaryClass={cs.CV,cs.LG}
 }
 ```

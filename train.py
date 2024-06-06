@@ -14,45 +14,41 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import io
-import os
-import math
-import torch
-import shutil
-import random
 import logging
-import diffusers
-import transformers
-from PIL import Image
+import math
+import os
+import shutil
 from pathlib import Path
-from tqdm.auto import tqdm
-from packaging import version
-import torch.nn.functional as F
-from datasets import load_dataset
+
+import torch
+import transformers
 from accelerate import Accelerator
-from transformers import AutoTokenizer
 from accelerate.logging import get_logger
-from huggingface_hub import create_repo, upload_folder
-from torchvision import transforms
-from torchvision.transforms.functional import crop
 from accelerate.utils import ProjectConfiguration, set_seed
-from diffusers.optimization import get_scheduler
-from diffusers.utils.import_utils import is_xformers_available
+from datasets import load_dataset
+from huggingface_hub import create_repo, upload_folder
+from packaging import version
+from tqdm.auto import tqdm
+from transformers import AutoTokenizer
+
+import diffusers
+from args import parse_args
 from diffusers import (
     AutoencoderKL,
     DDPMScheduler,
     UNet2DConditionModel,
 )
-from args import parse_args
+from diffusers.optimization import get_scheduler
+from diffusers.utils.import_utils import is_xformers_available
 from utils import (
+    collate_fn,
+    compute_loss,
+    compute_time_ids,
+    encode_prompt,
+    get_dataset_preprocessor,
+    get_wandb_url,
     import_model_class_from_model_name_or_path,
     log_validation,
-    collate_fn,
-    encode_prompt,
-    get_wandb_url,
-    get_dataset_preprocessor,
-    compute_time_ids,
-    compute_loss,
 )
 
 

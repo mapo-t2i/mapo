@@ -125,7 +125,7 @@ def log_validation(args, unet, vae, accelerator, weight_dtype, epoch, is_final_v
             for prompt in VALIDATION_PROMPTS
         ]
 
-        tracker_key = "test_without_lora" if not args.full_finetuning else "test_without_aligned_unet"
+        tracker_key = "test_without_lora" if args.lora_rank is not None else "test_without_aligned_unet"
         for tracker in accelerator.trackers:
             if tracker.name == "tensorboard":
                 np_images = np.stack([np.asarray(img) for img in no_lora_images])

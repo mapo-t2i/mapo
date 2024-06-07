@@ -14,8 +14,7 @@ For the paper, models, datasets, etc., please visit the [project website](TODO).
 **Contents**:
 
 * [Running MaPO training](#running-mapo-training)
-* [Models](#models) 
-* [Datasets](#datasets)
+* [Models and Datasets](#models-and-datasets) 
 * [Inference](#inference)
 * [Citation](#citation)
 
@@ -107,13 +106,9 @@ To push the intermediate checkpoints and the final checkoint to the Hugging Face
 
 For visual quantitative results, please refer to the [project website](TODO).
 
-## Models
+## Models and Datasets
 
-TODO
-
-## Datasets
-
-TODO
+All the models and datasets of our work can be found via our Hugging Face Hub organization: https://huggingface.co/mapo-t2i/.
 
 ## Inference
 

@@ -27,7 +27,8 @@ from accelerate.logging import get_logger
 from accelerate.utils import ProjectConfiguration, set_seed
 from datasets import load_dataset
 from huggingface_hub import create_repo, upload_folder
-from packaging import version
+from peft import LoraConfig, set_peft_model_state_dict
+from peft.utils import get_peft_model_state_dict
 from tqdm.auto import tqdm
 from transformers import AutoTokenizer
 
@@ -38,8 +39,9 @@ from diffusers import (
     DDPMScheduler,
     UNet2DConditionModel,
 )
+from diffusers.loaders import StableDiffusionXLLoraLoaderMixin
 from diffusers.optimization import get_scheduler
-from diffusers.utils.import_utils import is_xformers_available
+from diffusers.utils import convert_state_dict_to_diffusers, convert_unet_state_dict_to_peft
 from utils import (
     collate_fn,
     compute_loss,
@@ -56,6 +58,9 @@ logger = get_logger(__name__)
 
 
 def main(args):
+    if args.lora_rank is None:
+        raise ValueError("`--lora_rank` cannot be undefined when using LoRA training.")
+
     logging_dir = Path(args.output_dir, args.logging_dir)
 
     accelerator_project_config = ProjectConfiguration(project_dir=args.output_dir, logging_dir=logging_dir)
@@ -66,6 +71,10 @@ def main(args):
         log_with=args.report_to,
         project_config=accelerator_project_config,
     )
+
+    # Disable AMP for MPS.
+    if torch.backends.mps.is_available():
+        accelerator.native_amp = False
 
     # Make one log on every process with the configuration for debugging.
     logging.basicConfig(
@@ -92,8 +101,7 @@ def main(args):
 
         if args.push_to_hub:
             repo_id = create_repo(
-                repo_id=args.hub_model_id or Path(args.output_dir).name,
-                exist_ok=True,
+                repo_id=args.hub_model_id or Path(args.output_dir).name, exist_ok=True
             ).repo_id
 
     # Load the tokenizers
@@ -102,14 +110,12 @@ def main(args):
         subfolder="tokenizer",
         revision=args.revision,
         use_fast=False,
-        cache_dir=args.cache_dir,
     )
     tokenizer_two = AutoTokenizer.from_pretrained(
         args.pretrained_model_name_or_path,
         subfolder="tokenizer_2",
         revision=args.revision,
         use_fast=False,
-        cache_dir=args.cache_dir,
     )
 
     # import correct text encoder classes
@@ -121,23 +127,13 @@ def main(args):
     )
 
     # Load scheduler and models
-    noise_scheduler = DDPMScheduler.from_pretrained(
-        args.pretrained_model_name_or_path, subfolder="scheduler", cache_dir=args.cache_dir
-    )
+    noise_scheduler = DDPMScheduler.from_pretrained(args.pretrained_model_name_or_path, subfolder="scheduler")
 
     text_encoder_one = text_encoder_cls_one.from_pretrained(
-        args.pretrained_model_name_or_path,
-        subfolder="text_encoder",
-        revision=args.revision,
-        variant=args.variant,
-        cache_dir=args.cache_dir,
+        args.pretrained_model_name_or_path, subfolder="text_encoder", revision=args.revision, variant=args.variant
     )
     text_encoder_two = text_encoder_cls_two.from_pretrained(
-        args.pretrained_model_name_or_path,
-        subfolder="text_encoder_2",
-        revision=args.revision,
-        variant=args.variant,
-        cache_dir=args.cache_dir,
+        args.pretrained_model_name_or_path, subfolder="text_encoder_2", revision=args.revision, variant=args.variant
     )
     vae_path = (
         args.pretrained_model_name_or_path
@@ -149,23 +145,18 @@ def main(args):
         subfolder="vae" if args.pretrained_vae_model_name_or_path is None else None,
         revision=args.revision,
         variant=args.variant,
-        cache_dir=args.cache_dir,
     )
     unet = UNet2DConditionModel.from_pretrained(
-        args.pretrained_model_name_or_path,
-        subfolder="unet",
-        revision=args.revision,
-        variant=args.variant,
-        cache_dir=args.cache_dir,
+        args.pretrained_model_name_or_path, subfolder="unet", revision=args.revision, variant=args.variant
     )
 
-    # Set the grad requirements.
+    # We only train the additional adapter LoRA layers
     vae.requires_grad_(False)
     text_encoder_one.requires_grad_(False)
     text_encoder_two.requires_grad_(False)
-    unet.requires_grad_(True)
+    unet.requires_grad_(False)
 
-    # For mixed precision training we cast all non-trainable weights to half-precision
+    # For mixed precision training we cast all non-trainable weights (vae, non-lora text_encoder and non-lora unet) to half-precision
     # as these weights are only used for inference, keeping weights in full precision is not required.
     weight_dtype = torch.float32
     if accelerator.mixed_precision == "fp16":
@@ -173,25 +164,28 @@ def main(args):
     elif accelerator.mixed_precision == "bf16":
         weight_dtype = torch.bfloat16
 
-    # Move text_encoders to device and cast to weight_dtype
+    # Move unet and text_encoders to device and cast to weight_dtype
+    unet.to(accelerator.device, dtype=weight_dtype)
     text_encoder_one.to(accelerator.device, dtype=weight_dtype)
     text_encoder_two.to(accelerator.device, dtype=weight_dtype)
 
     # The VAE is always in float32 to avoid NaN losses.
     vae.to(accelerator.device, dtype=torch.float32)
 
-    if args.enable_xformers_memory_efficient_attention:
-        if is_xformers_available():
-            import xformers
-
-            xformers_version = version.parse(xformers.__version__)
-            if xformers_version == version.parse("0.0.16"):
-                logger.warning(
-                    "xFormers 0.0.16 cannot be used for training in some GPUs. If you observe problems during training, please update xFormers to at least 0.0.17. See https://huggingface.co/docs/diffusers/main/en/optimization/xformers for more details."
-                )
-            unet.enable_xformers_memory_efficient_attention()
-        else:
-            raise ValueError("xformers is not available. Make sure it is installed correctly")
+    # Set up LoRA.
+    unet_lora_config = LoraConfig(
+        r=args.lora_rank,
+        lora_alpha=args.lora_rank,
+        init_lora_weights="gaussian",
+        target_modules=["to_k", "to_q", "to_v", "to_out.0"],
+    )
+    # Add adapter and make sure the trainable params are in float32.
+    unet.add_adapter(unet_lora_config)
+    if args.mixed_precision == "fp16":
+        for param in unet.parameters():
+            # only upcast trainable parameters (LoRA) into fp32
+            if param.requires_grad:
+                param.data = param.to(torch.float32)
 
     if args.gradient_checkpointing:
         unet.enable_gradient_checkpointing()
@@ -199,14 +193,25 @@ def main(args):
     # create custom saving & loading hooks so that `accelerator.save_state(...)` serializes in a nice format
     def save_model_hook(models, weights, output_dir):
         if accelerator.is_main_process:
+            # there are only two options here. Either are just the unet attn processor layers
+            # or there are the unet and text encoder atten layers
+            unet_lora_layers_to_save = None
+
             for model in models:
                 if isinstance(model, type(accelerator.unwrap_model(unet))):
-                    model.save_pretrained(os.path.join(output_dir, "unet"))
+                    unet_lora_layers_to_save = convert_state_dict_to_diffusers(get_peft_model_state_dict(model))
                 else:
                     raise ValueError(f"unexpected save model: {model.__class__}")
 
                 # make sure to pop weight so that corresponding model is not saved again
                 weights.pop()
+
+            StableDiffusionXLLoraLoaderMixin.save_lora_weights(
+                output_dir,
+                unet_lora_layers=unet_lora_layers_to_save,
+                text_encoder_lora_layers=None,
+                text_encoder_2_lora_layers=None,
+            )
 
     def load_model_hook(models, input_dir):
         unet_ = None
@@ -219,11 +224,19 @@ def main(args):
             else:
                 raise ValueError(f"unexpected save model: {model.__class__}")
 
-        load_model = UNet2DConditionModel.from_pretrained(input_dir, subfolder="unet")
-        unet_.register_to_config(**load_model.config)
+        lora_state_dict, network_alphas = StableDiffusionXLLoraLoaderMixin.lora_state_dict(input_dir)
 
-        unet_.load_state_dict(load_model.state_dict())
-        del load_model
+        unet_state_dict = {f'{k.replace("unet.", "")}': v for k, v in lora_state_dict.items() if k.startswith("unet.")}
+        unet_state_dict = convert_unet_state_dict_to_peft(unet_state_dict)
+        incompatible_keys = set_peft_model_state_dict(unet_, unet_state_dict, adapter_name="default")
+        if incompatible_keys is not None:
+            # check only for unexpected keys
+            unexpected_keys = getattr(incompatible_keys, "unexpected_keys", None)
+            if unexpected_keys:
+                logger.warning(
+                    f"Loading adapter weights from state_dict led to unexpected keys not found in the model: "
+                    f" {unexpected_keys}. "
+                )
 
     accelerator.register_save_state_pre_hook(save_model_hook)
     accelerator.register_load_state_pre_hook(load_model_hook)
@@ -279,6 +292,7 @@ def main(args):
             train_dataset = train_dataset.filter(lambda example: example["label_0"] != example["label_1"])
         else:
             pass
+        # Set the training transforms
         train_dataset = train_dataset.with_transform(preprocess_train_fn)
 
     train_dataloader = torch.utils.data.DataLoader(
@@ -503,10 +517,19 @@ def main(args):
             if global_step >= args.max_train_steps:
                 break
 
+    # Save the lora layers
     accelerator.wait_for_everyone()
     if accelerator.is_main_process:
         unet = accelerator.unwrap_model(unet)
-        unet.save_pretrained(args.output_dir)
+        unet = unet.to(torch.float32)
+        unet_lora_state_dict = convert_state_dict_to_diffusers(get_peft_model_state_dict(unet))
+
+        StableDiffusionXLLoraLoaderMixin.save_lora_weights(
+            save_directory=args.output_dir,
+            unet_lora_layers=unet_lora_state_dict,
+            text_encoder_lora_layers=None,
+            text_encoder_2_lora_layers=None,
+        )
 
         # Final validation?
         if args.run_validation:

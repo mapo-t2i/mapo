@@ -60,6 +60,35 @@ accelerate launch train.py \
   --seed="0" 
 ```
 
+> [!NOTE]  
+> In the above command, we use a smaller version of the original Pick-a-Pic dataset -- [`kashif/pickascore`](https://huggingface.co/datasets/kashif/pickascore) for debugging and validation purposes.
+
+### Running with LoRA
+
+We provide a LoRA variant of the `train.py` script in `train_with_lora.py` so that one can experiment with MaPO on consumer GPUs. To run `train_with_lora.py`, first install the `peft` library. 
+
+And then you can use the following command to start a LoRA training run:
+
+```bash
+accelerate launch train_with_lora.py \
+  --pretrained_model_name_or_path=stabilityai/stable-diffusion-xl-base-1.0  \
+  --pretrained_vae_model_name_or_path=madebyollin/sdxl-vae-fp16-fix \
+  --output_dir="mapo" \
+  --mixed_precision="fp16" \
+  --dataset_name=kashif/pickascore \
+  --train_batch_size=8 \
+  --gradient_accumulation_steps=2 \
+  --gradient_checkpointing \
+  --lora_rank=8 \
+  --use_8bit_adam \
+  --learning_rate=1e-5 \
+  --lr_scheduler="constant" \
+  --lr_warmup_steps=0 \
+  --max_train_steps=2000 \
+  --checkpointing_steps=500 \
+  --seed="0" 
+```
+
 ### Misc
 
 <details>
@@ -102,8 +131,7 @@ To push the intermediate checkpoints and the final checkoint to the Hugging Face
 
 **Notes on evaluation**:
 
-* If you are constrained by GPU memory, then we encourage you to conduct LoRA-based MaPO training. You could repurpose the Diffusion DPO with LoRA code from [here](https://github.com/huggingface/diffusers/blob/main/examples/research_projects/diffusion_dpo/train_diffusion_dpo_sdxl.py) for this. 
-* For evaluation with metrics like Aesthetic Scoring, HPS v2.1, and Pickscore, we followed the respective official codebases.
+For evaluation with metrics like Aesthetic Scoring, HPS v2.1, and Pickscore, we followed the respective official codebases.
 
 For visual quantitative results, please refer to the [project website](TODO).
 

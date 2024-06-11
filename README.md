@@ -9,7 +9,7 @@ This repository provides the official PyTorch implementation for MaPO.
 _By: Jiwoo Hong<sup>\*</sup>, Sayak Paul<sup>\*</sup>, Noah Lee, Kashif Rasul, James Thorne, Jongheon Jeong_
 <br>_(<small><sup>*</sup> indicates equal contribution</small>)_
 
-For the paper, models, datasets, etc., please visit the [project website](TODO).
+For the paper, models, datasets, etc., please visit the [project website](https://mapo-t2i.github.io/).
 
 **Contents**:
 
@@ -159,12 +159,12 @@ image = pipeline(prompt=prompt, num_inference_steps=30).images[0]
 ## Citation
 
 ```bibtex
-@misc{todo,
+@misc{hong2024marginaware,
     title={Margin-aware Preference Optimization for Aligning Diffusion Models without Reference}, 
-    author={Jiwoo Hong and Sayak Paul and Noah Lee and Kashif Rasuland James Thorne and Jongheon Jeong},
+    author={Jiwoo Hong and Sayak Paul and Noah Lee and Kashif Rasul and James Thorne and Jongheon Jeong},
     year={2024},
-    eprint={todo},
+    eprint={2406.06424},
     archivePrefix={arXiv},
-    primaryClass={cs.CV,cs.LG}
+    primaryClass={cs.CV}
 }
 ```

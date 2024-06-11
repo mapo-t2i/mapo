@@ -64,9 +64,9 @@ accelerate launch train.py \
 
 ### Running with LoRA
 
-We provide a LoRA variant of the `train.py` script in `train_with_lora.py` so that one can experiment with MaPO on consumer GPUs. To run `train_with_lora.py`, first install the `peft` library. 
+We provide a LoRA variant of the `train.py` script in `train_with_lora.py` so one can experiment with MaPO on consumer GPUs. To run `train_with_lora.py`, first, install the `peft` library. 
 
-And then you can use the following command to start a LoRA training run:
+Then you can use the following command to start a LoRA training run:
 
 ```bash
 accelerate launch train_with_lora.py \
@@ -123,16 +123,16 @@ accelerate launch --multi_gpu train.py \
 
 This will additionally, log the generated results and other metrics to Weights and Biases. This requires you to install the `wandb` Python package. 
 
-Other option for an experiment logger is `tensorboard`. 
+Another option for an experiment logger is `tensorboard`. 
 </details><br>
 
-To push the intermediate checkpoints and the final checkoint to the Hugging Face Hub platform, pass the `--push_to_hub` option. Note that you need to be authenticated to use your Hugging Face Hub account for this. 
+To push the intermediate checkpoints and the final checkpoint to the Hugging Face Hub platform, pass the `--push_to_hub` option. Just so you know, you need to be authenticated to use your Hugging Face Hub account for this. 
 
 **Notes on evaluation**:
 
 For evaluation with metrics like Aesthetic Scoring, HPS v2.1, and Pickscore, we followed the respective official codebases.
 
-For visual quantitative results, please refer to the [project website](TODO).
+For visual quantitative results, please refer to the [project website](https://mapo-t2i.github.io/).
 
 ## Models and Datasets
 
